@@ -104,3 +104,29 @@ def test_quiz_uses_previous_dialogue_context() -> None:
 
     assert "stack overflow" in hint
     assert "trade-offs" in hint or "trade offs" in hint
+
+
+def test_quiz_context_excludes_control_prompts() -> None:
+    state = init_learning_system()
+
+    first = process_study_turn(state, "Explain recursion")
+    sid = first["session_id"]
+    process_study_turn(state, "Generate a quiz", session_id=sid)
+    process_study_turn(state, "My answer is recursion repeats.", session_id=sid)
+    second_quiz = process_study_turn(state, "Generate a quiz", session_id=sid)
+    hint = second_quiz["payloads"]["quiz"]["hint"].lower()
+
+    assert "generate a quiz" not in hint
+
+
+def test_empty_message_returns_consistent_response_schema() -> None:
+    state = init_learning_system()
+
+    result = process_study_turn(state, "   ")
+
+    assert result["session_id"]
+    assert result["response"] == "Please enter a question."
+    assert result["actions"] == []
+    assert result["tools_called"] == []
+    assert "payloads" in result
+    assert "session" in result

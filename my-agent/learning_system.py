@@ -232,11 +232,21 @@ def _dialogue_context(session: SessionState, max_turns: int = 4) -> str:
         return ""
 
     snippets: list[str] = []
+    seen: set[str] = set()
     for turn in recent:
         message = str(turn.get("message", "")).strip()
-        if not message:
-            continue
-        snippets.append(message)
+        if message and not (_is_quiz_request(message) or _is_revision_request(message)):
+            normalized = " ".join(message.split())
+            if normalized and normalized.lower() not in seen:
+                seen.add(normalized.lower())
+                snippets.append(normalized)
+
+        response_excerpt = str(turn.get("response_excerpt", "")).strip()
+        if response_excerpt:
+            normalized_response = " ".join(response_excerpt.split())
+            if normalized_response and normalized_response.lower() not in seen:
+                seen.add(normalized_response.lower())
+                snippets.append(normalized_response)
 
     return " | ".join(snippets)
 
@@ -278,7 +288,12 @@ def process_study_turn(
             "response": "Please enter a question.",
             "actions": [],
             "tools_called": [],
+            "payloads": {},
             "analytics": _analytics_snapshot(state),
+            "session": {
+                "current_topic": session.current_topic,
+                "awaiting_quiz_answer": session.awaiting_quiz_answer,
+            },
         }
 
     actions: list[str] = []
@@ -432,6 +447,7 @@ def process_study_turn(
         "message": user_message,
         "actions": actions,
         "tools_called": tools_called,
+        "response_excerpt": " ".join(response.split())[:280],
     }
     session.history.append(record)
 
